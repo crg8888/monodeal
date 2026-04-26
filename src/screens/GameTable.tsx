@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { getIdentity } from '../lib/identity';
 import { broadcastStateChanged, useGameStore } from '../state/gameStore';
 import { Card as CardView, colorHex } from '../components/Card';
+import { SpellWizard } from '../components/SpellWizard';
 import { ITEM_SETS, isColumnComplete, colorHumanName } from '../lib/rules';
 import type { Color, Player, Card as CardData, ItemColumn } from '../types/game';
 
@@ -18,6 +19,8 @@ export function GameTable() {
   const me = getIdentity();
   const [working, setWorking] = useState(false);
   const [colorPick, setColorPick] = useState<{ card: CardData } | null>(null);
+  const [spellChoice, setSpellChoice] = useState<{ card: CardData } | null>(null);
+  const [castingSpell, setCastingSpell] = useState<CardData | null>(null);
   const [discardPicker, setDiscardPicker] = useState<{ excess: number } | null>(null);
   const [discardSelection, setDiscardSelection] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
@@ -109,9 +112,17 @@ export function GameTable() {
       setError('No plays left this turn — end your turn.');
       return;
     }
-    if (card.category === 'point' || card.category === 'spell') {
-      // Slice 3 only banks spells; cast happens in Slice 5.
+    if (card.category === 'point') {
       void playToBank(card.id);
+      return;
+    }
+    if (card.category === 'spell') {
+      // Spell: bank or cast (Slice 5). Protego is reactive only, can't cast.
+      if (card.spell_effect === 'protego') {
+        void playToBank(card.id);
+        return;
+      }
+      setSpellChoice({ card });
       return;
     }
     if (card.category === 'item') {
@@ -221,6 +232,35 @@ export function GameTable() {
             ))}
           </div>
         </Modal>
+      )}
+
+      {spellChoice && (
+        <Modal onClose={() => setSpellChoice(null)}>
+          <div className="text-lg font-bold mb-1">{spellChoice.card.title}</div>
+          <p className="text-sm text-stone-500 mb-4">
+            Bank for cash {spellChoice.card.cash_value ?? 0}, or cast for the effect?
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => { void playToBank(spellChoice.card.id); setSpellChoice(null); }}
+              className="flex-1 px-4 py-2 bg-stone-200 text-stone-900 rounded font-medium hover:bg-stone-300">
+              Bank ({spellChoice.card.cash_value ?? 0})
+            </button>
+            <button
+              onClick={() => { setCastingSpell(spellChoice.card); setSpellChoice(null); }}
+              className="flex-1 px-4 py-2 bg-emerald-700 text-white rounded font-medium hover:bg-emerald-600">
+              Cast spell
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {castingSpell && (
+        <SpellWizard
+          card={castingSpell}
+          onClose={() => setCastingSpell(null)}
+          onCast={() => setCastingSpell(null)}
+        />
       )}
 
       {discardPicker && (
