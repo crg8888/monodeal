@@ -56,9 +56,24 @@ export function GameTable() {
     return data;
   };
 
-  const draw = () => callRpc('start_turn', {
+  const draw = (fromDiscard = false) => callRpc('start_turn', {
     p_actor_id: me.player_id, p_actor_token: me.player_token,
+    p_from_discard: fromDiscard,
   });
+
+  const [petrificusPicker, setPetrificusPicker] = useState(false);
+  const [petrificusSelection, setPetrificusSelection] = useState<Set<string>>(new Set());
+  const removePetrificus = async () => {
+    if (petrificusSelection.size === 0) return;
+    const result = await callRpc('remove_petrificus', {
+      p_actor_id: me.player_id, p_actor_token: me.player_token,
+      p_card_ids: Array.from(petrificusSelection),
+    });
+    if (result) {
+      setPetrificusPicker(false);
+      setPetrificusSelection(new Set());
+    }
+  };
 
   const playToBank = async (cardId: string) => {
     await callRpc('play_to_bank', {
@@ -193,9 +208,24 @@ export function GameTable() {
           <div className="text-xs text-stone-500">Your hand · {myHand.length} cards</div>
           <div className="flex gap-2">
             {isMyTurn && !hasDrawn && (
-              <button onClick={draw} disabled={working}
-                      className="px-3 py-1.5 bg-emerald-700 text-white rounded text-sm font-medium hover:bg-emerald-600 disabled:opacity-50">
-                Draw {(myPlayer.hand_count === 0 ? 5 : 2)}
+              <>
+                <button onClick={() => draw(false)} disabled={working}
+                        className="px-3 py-1.5 bg-emerald-700 text-white rounded text-sm font-medium hover:bg-emerald-600 disabled:opacity-50">
+                  Draw {(myPlayer.hand_count === 0 ? 5 : 2)}
+                </button>
+                {myPlayer.chosen_character === 'cedric' && !myPlayer.petrified
+                 && gameState.discard_pile.length > 0 && (
+                  <button onClick={() => draw(true)} disabled={working}
+                          className="px-3 py-1.5 bg-yellow-600 text-white rounded text-sm font-medium hover:bg-yellow-500 disabled:opacity-50">
+                    Draw (top of discard)
+                  </button>
+                )}
+              </>
+            )}
+            {isMyTurn && myPlayer.petrified && (
+              <button onClick={() => setPetrificusPicker(true)} disabled={working}
+                      className="px-3 py-1.5 bg-purple-700 text-white rounded text-sm font-medium hover:bg-purple-600 disabled:opacity-50">
+                Break Petrificus
               </button>
             )}
             {isMyTurn && hasDrawn && (
@@ -270,6 +300,44 @@ export function GameTable() {
       )}
 
       {myActiveDebt && <PaymentModal debt={myActiveDebt} />}
+
+      {petrificusPicker && (
+        <Modal onClose={() => setPetrificusPicker(false)}>
+          <div className="text-lg font-bold mb-1">Break Petrificus</div>
+          <p className="text-sm text-stone-500 mb-3">
+            Discard ≥ 10 cash from your bank. The Petrificus card goes with it.
+            Selected: <span className="font-bold">
+              {Array.from(petrificusSelection).reduce((s, id) => s + (cards[id]?.cash_value ?? 0), 0)}
+            </span> / 10
+          </p>
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 max-h-80 overflow-auto mb-4">
+            {myPlayer.bank.map((id) => {
+              const card = cards[id];
+              if (!card) return null;
+              if (card.spell_effect === 'petrificus_totalus') return null; // hide attached
+              const sel = petrificusSelection.has(id);
+              return (
+                <div key={id} onClick={() => {
+                  const next = new Set(petrificusSelection);
+                  if (sel) next.delete(id); else next.add(id);
+                  setPetrificusSelection(next);
+                }} className="cursor-pointer">
+                  <CardView card={card} variant="compressed" selected={sel} />
+                </div>
+              );
+            })}
+          </div>
+          <button
+            onClick={removePetrificus}
+            disabled={
+              Array.from(petrificusSelection).reduce((s, id) => s + (cards[id]?.cash_value ?? 0), 0) < 10
+              || working
+            }
+            className="w-full px-4 py-2 bg-purple-700 text-white rounded font-medium disabled:opacity-50">
+            Break Petrificus
+          </button>
+        </Modal>
+      )}
       {!myActiveDebt && someoneElsePaying && (
         <div className="fixed bottom-4 left-4 bg-amber-100 border border-amber-300 text-amber-900 text-sm px-3 py-2 rounded shadow">
           Waiting for {players.find((p) => p.id === someoneElsePaying.debtor_id)?.name ?? 'someone'} to pay {someoneElsePaying.amount}…
@@ -333,9 +401,14 @@ function OpponentZone(props: {
     <div className={`bg-white rounded p-2 border-2 ${isTurn ? 'border-emerald-500' : 'border-stone-200'}`}>
       <div className="flex items-center justify-between mb-1">
         <span className="text-xs font-medium text-stone-900 truncate">{player.name}</span>
-        <span className="text-[10px] text-stone-500 capitalize">
-          {player.chosen_character ?? '—'}
-        </span>
+        <div className="flex items-center gap-1">
+          {player.petrified && (
+            <span className="text-[9px] px-1 bg-purple-200 text-purple-900 rounded font-bold">PETRIFIED</span>
+          )}
+          <span className="text-[10px] text-stone-500 capitalize">
+            {player.chosen_character ?? '—'}
+          </span>
+        </div>
       </div>
       <div className="text-[10px] text-stone-500 mb-1">
         Hand {player.hand_count} · Bank {bankCash}

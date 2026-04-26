@@ -34,6 +34,27 @@ full plan.
 
 ---
 
+## 2026-04-26 · Slice 7 · Reactive Protego deferred
+
+Protego cards exist in the deck (3 copies, cash 4) and can be banked, but the
+**reactive Protego stack is not implemented** in v1. Spells from Slices 5/6 (Levicorpus, Wingardium, Confundo, Obliviate, Stupefy, Alohomora, Accio) resolve
+immediately, with no reaction window.
+
+**Why:** the Protego state machine (spec lines 399-429) requires refactoring
+`cast_spell` to push frames onto `pending_stack` and defer effect application
+to a new `_resolve_top_frame` helper. The chain logic (Protego on Protego with
+odd/even depth tracking) is the spec's most complex correctness work and was
+out of scope for the same-day evening shipping target.
+
+**How to apply:** treat Protego as a cash card for v1. Friends will play
+without reactive blocks; the game is fully end-to-end functional otherwise.
+A v2 add-on can land as a follow-up migration that:
+1. Refactors `cast_spell` to call `_push_spell_frame` instead of resolving.
+2. Adds `play_protego`, `pass_reaction` RPCs.
+3. Adds reactive UI overlay watching `pending_stack`.
+
+---
+
 ## 2026-04-26 · Slice 0 · Wild card cash values are TABLE-authoritative
 
 The spec prose at line 314 says "Wild cash = max(cash of both colors) per
