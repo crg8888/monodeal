@@ -4,6 +4,7 @@ import { getIdentity } from '../lib/identity';
 import { broadcastStateChanged, useGameStore } from '../state/gameStore';
 import { Card as CardView, colorHex } from '../components/Card';
 import { SpellWizard } from '../components/SpellWizard';
+import { PaymentModal } from '../components/PaymentModal';
 import { ITEM_SETS, isColumnComplete, colorHumanName } from '../lib/rules';
 import type { Color, Player, Card as CardData, ItemColumn } from '../types/game';
 
@@ -143,6 +144,11 @@ export function GameTable() {
     ? players.find((p) => p.id === gameState.winner_player_id)
     : null;
 
+  const myActiveDebt = gameState.payment_queue.find(
+    (d) => d.debtor_id === me.player_id && d.status === 'active',
+  );
+  const someoneElsePaying = gameState.payment_queue.find((d) => d.status === 'active');
+
   return (
     <div className="min-h-dvh bg-stone-100 flex flex-col">
       {winnerPlayer && (
@@ -261,6 +267,13 @@ export function GameTable() {
           onClose={() => setCastingSpell(null)}
           onCast={() => setCastingSpell(null)}
         />
+      )}
+
+      {myActiveDebt && <PaymentModal debt={myActiveDebt} />}
+      {!myActiveDebt && someoneElsePaying && (
+        <div className="fixed bottom-4 left-4 bg-amber-100 border border-amber-300 text-amber-900 text-sm px-3 py-2 rounded shadow">
+          Waiting for {players.find((p) => p.id === someoneElsePaying.debtor_id)?.name ?? 'someone'} to pay {someoneElsePaying.amount}…
+        </div>
       )}
 
       {discardPicker && (

@@ -12,7 +12,8 @@ type Step =
   | { kind: 'pick_my_item'; targetId: string; targetCardId: string }
   | { kind: 'pick_complete_color'; targetId: string }
   | { kind: 'pick_discard_card' }
-  | { kind: 'pick_wild_color'; reparoCardId: string };
+  | { kind: 'pick_wild_color'; reparoCardId: string }
+  | { kind: 'pick_accio_color' };
 
 export function SpellWizard(props: {
   card: CardData;
@@ -34,15 +35,23 @@ export function SpellWizard(props: {
 
   function initialStep(effect: string | null | undefined): Step | null {
     switch (effect) {
-      case 'geminio': return null; // immediate
+      case 'geminio': return null;
+      case 'alohomora': return null; // no targeting; hits all opponents
       case 'reparo': return { kind: 'pick_discard_card' };
       case 'petrificus_totalus':
       case 'levicorpus':
       case 'wingardium_leviosa':
       case 'confundo':
-        return { kind: 'pick_opponent' };
+      case 'stupefy':
       case 'obliviate':
         return { kind: 'pick_opponent' };
+      case 'accio_brown_light_blue':
+      case 'accio_pink_orange':
+      case 'accio_light_green_black':
+      case 'accio_red_yellow':
+      case 'accio_dark_blue_dark_green':
+      case 'accio_any':
+        return { kind: 'pick_accio_color' };
       default:
         return null;
     }
@@ -75,8 +84,9 @@ export function SpellWizard(props: {
     props.onCast();
   };
 
-  // Geminio fires automatically on mount.
-  if (props.card.spell_effect === 'geminio' && !working && !error && step === null) {
+  // Spells with no targeting fire automatically on mount.
+  const autoCast = props.card.spell_effect === 'geminio' || props.card.spell_effect === 'alohomora';
+  if (autoCast && !working && !error && step === null) {
     void cast();
   }
 
@@ -104,14 +114,22 @@ export function SpellWizard(props: {
 
         {step?.kind === 'pick_opponent' && (
           <PickOpponent opponents={opponents} onPick={(id) => {
-            if (props.card.spell_effect === 'petrificus_totalus') {
+            const effect = props.card.spell_effect;
+            if (effect === 'petrificus_totalus' || effect === 'stupefy') {
               void cast({ target_player_id: id });
-            } else if (props.card.spell_effect === 'obliviate') {
+            } else if (effect === 'obliviate') {
               setStep({ kind: 'pick_complete_color', targetId: id });
             } else {
               setStep({ kind: 'pick_target_item', targetId: id });
             }
           }} />
+        )}
+
+        {step?.kind === 'pick_accio_color' && (
+          <PickAccioColor
+            allowedColors={(props.card.spell_allowed_colors ?? []) as Color[]}
+            onPick={(c) => void cast({ chosen_color: c })}
+          />
         )}
 
         {step?.kind === 'pick_target_item' && (
@@ -275,6 +293,27 @@ function PickCompleteColor(props: {
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+function PickAccioColor(props: {
+  allowedColors: Color[];
+  onPick: (color: Color) => void;
+}) {
+  return (
+    <div>
+      <div className="text-sm font-medium text-stone-700 mb-2">Pick a color to Accio</div>
+      <div className="flex gap-2 flex-wrap">
+        {props.allowedColors.map((c) => (
+          <button key={c} onClick={() => props.onPick(c)}
+                  className="h-12 w-12 rounded border-2 border-stone-200 hover:border-stone-900"
+                  style={{ background: colorHex(c) }} title={colorHumanName(c)} />
+        ))}
+      </div>
+      <p className="text-xs text-stone-500 mt-2">
+        Each opponent pays the charge for your count of that color.
+      </p>
     </div>
   );
 }
