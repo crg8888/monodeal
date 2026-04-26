@@ -5,6 +5,7 @@ import { broadcastStateChanged, useGameStore } from '../state/gameStore';
 import { Card as CardView, colorHex } from '../components/Card';
 import { SpellWizard } from '../components/SpellWizard';
 import { PaymentModal } from '../components/PaymentModal';
+import { isHost } from '../lib/identity';
 import { ITEM_SETS, isColumnComplete, colorHumanName } from '../lib/rules';
 import type { Color, Player, Card as CardData, ItemColumn } from '../types/game';
 
@@ -158,6 +159,21 @@ export function GameTable() {
   const winnerPlayer = gameState.winner_player_id
     ? players.find((p) => p.id === gameState.winner_player_id)
     : null;
+  const meIsHost = isHost(me, gameState.host_player_id);
+  const [logOpen, setLogOpen] = useState(false);
+  const [hostOpen, setHostOpen] = useState(false);
+
+  const newGame = async () => {
+    await callRpc('reset_to_lobby', {
+      p_actor_id: me.player_id, p_actor_token: me.player_token,
+    });
+  };
+  const forceEnd = async () => {
+    if (!confirm('Force-end the current turn?')) return;
+    await callRpc('host_force_end_turn', {
+      p_actor_id: me.player_id, p_actor_token: me.player_token,
+    });
+  };
 
   const myActiveDebt = gameState.payment_queue.find(
     (d) => d.debtor_id === me.player_id && d.status === 'active',
@@ -167,8 +183,14 @@ export function GameTable() {
   return (
     <div className="min-h-dvh bg-stone-100 flex flex-col">
       {winnerPlayer && (
-        <div className="bg-amber-400 text-amber-950 p-4 text-center font-bold text-lg">
-          🎉 {winnerPlayer.name} wins!
+        <div className="bg-amber-400 text-amber-950 p-4 text-center">
+          <div className="font-bold text-lg">🎉 {winnerPlayer.name} wins!</div>
+          {meIsHost && (
+            <button onClick={newGame}
+                    className="mt-2 px-4 py-1.5 bg-amber-950 text-amber-100 rounded text-sm font-medium hover:bg-amber-800">
+              New game (same players)
+            </button>
+          )}
         </div>
       )}
 
@@ -252,9 +274,61 @@ export function GameTable() {
 
       {error && (
         <div onClick={() => setError(null)}
-             className="fixed bottom-4 right-4 max-w-sm p-3 bg-red-100 border border-red-300 text-red-900 text-sm rounded shadow cursor-pointer">
+             className="fixed bottom-4 right-4 max-w-sm p-3 bg-red-100 border border-red-300 text-red-900 text-sm rounded shadow cursor-pointer z-30">
           {error}
         </div>
+      )}
+
+      {/* Game log toggle (top-right) */}
+      <button onClick={() => setLogOpen(!logOpen)}
+              className="fixed top-2 right-2 z-20 px-2 py-1 bg-white border border-stone-300 rounded text-xs text-stone-700 hover:bg-stone-50">
+        {logOpen ? 'hide log' : `log (${gameState.log.length})`}
+      </button>
+
+      {logOpen && (
+        <div className="fixed top-10 right-2 z-20 w-72 max-h-96 overflow-auto bg-white border border-stone-300 rounded shadow-lg p-2 text-xs">
+          {[...gameState.log].slice(-30).reverse().map((l, i) => (
+            <div key={i} className="py-0.5 border-b border-stone-100">
+              <span className="text-stone-400 mr-1">[{l.kind}]</span>
+              {l.text}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Host sidebar (only host sees) */}
+      {meIsHost && (
+        <>
+          <button onClick={() => setHostOpen(!hostOpen)}
+                  className="fixed top-2 left-2 z-20 px-2 py-1 bg-amber-100 border border-amber-300 rounded text-xs text-amber-900 hover:bg-amber-200 font-medium">
+            {hostOpen ? 'hide host' : '★ host'}
+          </button>
+          {hostOpen && (
+            <div className="fixed top-10 left-2 z-20 w-56 bg-white border border-amber-200 rounded shadow-lg p-2 space-y-1">
+              <div className="text-xs text-stone-500 mb-1">Host controls</div>
+              <button onClick={forceEnd}
+                      className="w-full px-2 py-1.5 bg-stone-200 hover:bg-stone-300 rounded text-xs text-left">
+                Force-end current turn
+              </button>
+              <button onClick={async () => {
+                if (!confirm('Reset and start a new game with same players?')) return;
+                await newGame();
+              }}
+                      className="w-full px-2 py-1.5 bg-emerald-100 hover:bg-emerald-200 rounded text-xs text-left">
+                Restart (same players)
+              </button>
+              <button onClick={async () => {
+                if (!confirm('Full reset — kick everyone back to name entry?')) return;
+                await callRpc('host_full_reset', {
+                  p_actor_id: me.player_id, p_actor_token: me.player_token,
+                });
+              }}
+                      className="w-full px-2 py-1.5 bg-red-100 hover:bg-red-200 rounded text-xs text-left">
+                Full reset (kick all)
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {colorPick && (
