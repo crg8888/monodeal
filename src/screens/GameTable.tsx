@@ -233,7 +233,11 @@ export function GameTable() {
               <>
                 <button onClick={() => draw(false)} disabled={working}
                         className="px-3 py-1.5 bg-emerald-700 text-white rounded text-sm font-medium hover:bg-emerald-600 disabled:opacity-50">
-                  Draw {(myPlayer.hand_count === 0 ? 5 : 2)}
+                  Draw {
+                    myPlayer.hand_count === 0
+                      ? 5
+                      : (myPlayer.chosen_character === 'luna' && !myPlayer.petrified ? 3 : 2)
+                  }
                 </button>
                 {myPlayer.chosen_character === 'cedric' && !myPlayer.petrified
                  && gameState.discard_pile.length > 0 && (
