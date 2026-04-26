@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
+import { getIdentity } from '../lib/identity';
 import type { GameStatePublic, Player, Card as CardData } from '../types/game';
 
 interface GameStore {
@@ -58,6 +59,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
         update.cards = cardMap;
       }
       set(update);
+
+      // Always pull the current player's hand alongside public state.
+      // The public view exposes hand_count only; this RPC is token-gated.
+      const me = getIdentity();
+      const phase = (gameRes.data as GameStatePublic | null)?.phase;
+      if (me && phase === 'in_game') {
+        await get().fetchMyHand(me.player_id, me.player_token);
+      }
     } catch (e) {
       set({ loading: false, error: (e as Error).message });
     }
