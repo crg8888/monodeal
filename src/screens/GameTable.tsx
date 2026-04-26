@@ -64,7 +64,12 @@ export function GameTable() {
 
   const playItemAs = async (cardId: string, color: Color) => {
     setColorPick(null);
-    await callRpc('play_item', {
+    const card = cards[cardId];
+    const rpc =
+      card?.category === 'wild_item_two_color' || card?.category === 'wild_item_any_color'
+        ? 'play_wild_item'
+        : 'play_item';
+    await callRpc(rpc, {
       p_actor_id: me.player_id, p_actor_token: me.player_token,
       p_card_id: cardId, p_color: color, p_target_column_id: null,
     });
@@ -119,7 +124,7 @@ export function GameTable() {
       return;
     }
     if (card.category === 'wild_item_two_color' || card.category === 'wild_item_any_color') {
-      setError('Wilds land in Slice 4.');
+      setColorPick({ card });
     }
   };
 
