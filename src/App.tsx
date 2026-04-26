@@ -65,6 +65,8 @@ function Game() {
     case 'lobby':
       return <Lobby />;
     case 'character_select':
+      // Legacy phase — characters are now allocated automatically by start_game.
+      // Kept as a safety net in case stale games landed here from older builds.
       return <CharacterSelect />;
     case 'in_game':
       return <GameTable />;

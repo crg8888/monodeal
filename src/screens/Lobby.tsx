@@ -43,7 +43,7 @@ export function Lobby() {
 
   const startGame = async () => {
     if (!me) return;
-    const { error } = await supabase.rpc('start_character_select', {
+    const { error } = await supabase.rpc('start_game', {
       p_actor_id: me.player_id,
       p_actor_token: me.player_token,
     });
@@ -119,7 +119,7 @@ export function Lobby() {
             >
               {players.length < 2
                 ? 'Waiting for 2+ players…'
-                : `Start with ${players.length} players`}
+                : `Start game · ${players.length} players (characters random)`}
             </button>
             <button
               onClick={fullReset}
