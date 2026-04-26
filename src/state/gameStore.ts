@@ -6,9 +6,11 @@ interface GameStore {
   gameState: GameStatePublic | null;
   players: Player[];
   cards: Record<string, CardData>;
+  myHand: string[];
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
+  fetchMyHand: (playerId: string, playerToken: string) => Promise<void>;
   startPolling: (intervalMs?: number) => () => void;
   cardLookup: (id: string) => CardData | undefined;
 }
@@ -17,8 +19,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
   gameState: null,
   players: [],
   cards: {},
+  myHand: [],
   loading: false,
   error: null,
+
+  fetchMyHand: async (playerId, playerToken) => {
+    const { data, error } = await supabase.rpc('get_my_hand', {
+      p_actor_id: playerId,
+      p_actor_token: playerToken,
+    });
+    if (!error) set({ myHand: (data ?? []) as string[] });
+  },
 
   cardLookup: (id: string) => get().cards[id],
 

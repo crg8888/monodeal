@@ -6,6 +6,7 @@ import { getIdentity, clearIdentity, setIdentity } from './lib/identity';
 import { NameEntry } from './screens/NameEntry';
 import { Lobby } from './screens/Lobby';
 import { CharacterSelect } from './screens/CharacterSelect';
+import { GameTable } from './screens/GameTable';
 
 function Game() {
   const gameState = useGameStore((s) => s.gameState);
@@ -66,7 +67,7 @@ function Game() {
     case 'character_select':
       return <CharacterSelect />;
     case 'in_game':
-      return <GameTableStub />;
+      return <GameTable />;
     case 'paused':
       return <PausedStub />;
     case 'finished':
@@ -81,9 +82,6 @@ function Game() {
 }
 
 // Stubs replaced in later slices.
-function GameTableStub() {
-  return <div className="p-8">In-game UI lands in Slice 3.</div>;
-}
 function PausedStub() {
   return <div className="p-8 text-center">Game is paused…</div>;
 }
